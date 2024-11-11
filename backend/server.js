@@ -57,66 +57,73 @@ app.delete('/api/chat-history', (req, res) => {
 });
 
 app.post('/api/gemini-chat', async (req, res) => {
-    const userMessage = req.body.text;
-  
-    // Load chat history for context
-    const chatHistory = JSON.parse(fs.readFileSync(chatHistoryPath, 'utf8'));
-  
-    // Prepare the API payload
-    const payload = {
-      contents: [
-        {
-          parts: [
-            { text: userMessage }
-          ]
-        }
-      ]
-    };
-  
-  
-    try {
-      // Send the request to the Gemini API
-      const url = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
+  const userMessage = req.body.text;
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-  
-  
-      const data = await response.json();
+  // Load chat history
+  const chatHistory = JSON.parse(fs.readFileSync(chatHistoryPath, 'utf8'));
 
-      if (!response.ok) {
-        throw new Error(data.error.message || 'Error communicating with Gemini API');
-      }
+  // Collect recent history up to the last 500 characters
+  const recentHistory = [];
+  let characterCount = 0;
 
-      // Ensure structure matches expected response
-      if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) {
-        throw new Error('Unexpected response structure from Gemini API');
-      }
+  for (let i = chatHistory.length - 1; i >= 0; i--) {
+    const message = chatHistory[i];
+    const text = message.isUser ? `Previous User Message: ${message.text}` : `Previous Bot Response: ${message.text}`;
+    characterCount += text.length;
 
-      // Collect text from each part and join with newline characters
-      const botMessage = data.candidates[0].content.parts
-        .map(part => part.text)
-        .join('\n');
-      
-  
-      // Add both user message and bot response to chat history
-      chatHistory.push({ id: chatHistory.length + 1, text: userMessage, isUser: true });
-      chatHistory.push({ id: chatHistory.length + 1, text: botMessage, isUser: false });
-  
-      fs.writeFileSync(chatHistoryPath, JSON.stringify(chatHistory, null, 2));
-  
-      // Send response back to frontend
-      res.json({ botMessage });
-    } catch (error) {
-      console.error('Error:', error);
-      res.status(500).json({ error: 'Failed to communicate with Gemini API' });
+    if (characterCount > 500) break;
+    recentHistory.unshift(text); // Add each message to the beginning to keep order
+  }
+
+  // Construct the `parts` array with labeled history and current message
+  const parts = recentHistory.map(text => ({ text: `Context from previous conversation:\n${text}` }));
+  parts.push({ text: `User's current question:\n${userMessage}` });
+
+  // Prepare payload with constructed parts array
+  const payload = {
+    contents: [{ parts }]
+  };
+
+  try {
+    const url = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error.message || 'Error communicating with Gemini API');
     }
-  });
+
+    // Ensure structure matches expected response
+    if (!data.candidates || !data.candidates[0].content || !data.candidates[0].content.parts) {
+      throw new Error('Unexpected response structure from Gemini API');
+    }
+
+    // Collect text from each part in the API's response
+    const botMessage = data.candidates[0].content.parts
+      .map(part => part.text)
+      .join('\n');
+    
+    // Append user and bot messages to chat history
+    chatHistory.push({ id: chatHistory.length + 1, text: userMessage, isUser: true });
+    chatHistory.push({ id: chatHistory.length + 1, text: botMessage, isUser: false });
+
+    fs.writeFileSync(chatHistoryPath, JSON.stringify(chatHistory, null, 2));
+
+    // Send the bot message back to the frontend
+    res.json({ botMessage });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Failed to communicate with Gemini API' });
+  }
+});
+
   
 
 // Start the server
