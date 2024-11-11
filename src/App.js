@@ -1,9 +1,10 @@
 import './App.css';
+import ChatBox from './components/ChatBox';
 
 function App() {
   return (
-    <div className="bg-red-500 h-screen flex items-center justify-center">
-      <h1 className="text-white text-3xl">Tailwind is Working!</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <ChatBox />
     </div>
   );
 }
