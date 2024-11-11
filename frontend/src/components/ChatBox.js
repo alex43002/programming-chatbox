@@ -16,20 +16,27 @@ const ChatBox = () => {
 
   const addMessage = (text, isUser) => {
     const newMessage = { id: messages.length + 1, text, isUser };
-
+  
     // Update state locally
     setMessages(prevMessages => [...prevMessages, newMessage]);
-
-    // Send new message to the backend
-    fetch('http://localhost:5000/api/chat-history', { // Use the full backend URL
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newMessage),
-    })
-      .then(response => response.json())
-      .then(data => console.log(data))
-      .catch(error => console.error('Error saving message:', error));
+  
+    // Only call the Gemini API for user messages
+    if (isUser) {
+      fetch('http://localhost:5000/api/gemini-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+        .then(response => response.json())
+        .then(data => {
+          const botMessage = data.botMessage;
+          // Add the bot's response to the chat
+          setMessages(prevMessages => [...prevMessages, { id: prevMessages.length + 1, text: botMessage, isUser: false }]);
+        })
+        .catch(error => console.error('Error sending message to Gemini API:', error));
+    }
   };
+  
 
   const resetChat = () => {
     fetch('http://localhost:5000/api/chat-history', { // Use the full backend URL
