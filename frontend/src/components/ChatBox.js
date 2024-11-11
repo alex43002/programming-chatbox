@@ -6,9 +6,9 @@ import Header from './Header';
 const ChatBox = () => {
   const [messages, setMessages] = useState([]);
 
-  // Load chat history from JSON on component mount
+  // Load chat history from the backend on component mount
   useEffect(() => {
-    fetch('/chatHistory.json')
+    fetch('http://localhost:5000/api/chat-history') // Use the full backend URL
       .then(response => response.json())
       .then(data => setMessages(data))
       .catch(error => console.error('Error loading chat history:', error));
@@ -16,11 +16,28 @@ const ChatBox = () => {
 
   const addMessage = (text, isUser) => {
     const newMessage = { id: messages.length + 1, text, isUser };
+
+    // Update state locally
     setMessages(prevMessages => [...prevMessages, newMessage]);
+
+    // Send new message to the backend
+    fetch('http://localhost:5000/api/chat-history', { // Use the full backend URL
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newMessage),
+    })
+      .then(response => response.json())
+      .then(data => console.log(data))
+      .catch(error => console.error('Error saving message:', error));
   };
 
   const resetChat = () => {
-    setMessages([]);
+    fetch('http://localhost:5000/api/chat-history', { // Use the full backend URL
+      method: 'DELETE',
+    })
+      .then(response => response.json())
+      .then(() => setMessages([])) // Clear the messages in state after a successful reset
+      .catch(error => console.error('Error resetting chat history:', error));
   };
 
   return (

@@ -1,5 +1,0 @@
-[
-    { "id": 1, "text": "Hello! How can I assist you today?", "isUser": false },
-    { "id": 2, "text": "Can you explain what AI is?", "isUser": true }
-]
-  
